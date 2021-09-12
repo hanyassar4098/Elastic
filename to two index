@@ -1,0 +1,5 @@
+{"index":"index1"}
+{"query" : {"match_all" : {}}, "from" : 0, "size" : 1}
+{"index":"index2"}
+{"query" : {"match_all" : {}}, "from" : 0, "size" : 1}
+http://host/_msearch
