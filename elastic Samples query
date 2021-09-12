@@ -1,0 +1,36 @@
+{
+    "from": 0,
+    "size": 25,
+    "track_total_hits": true,
+    "query": {
+        "bool": {
+            "filter": [
+                {
+                    "terms": {
+                        "documentType.keyword": [
+                            "PartEvent"
+                        ]
+                    }
+                },
+                {
+                    "terms": {
+                        "partId": [
+                            "35746125"
+                        ]
+                    }
+                }
+            ]
+        }
+    },
+    "_source": [
+        "id",
+        "partNumber"       
+    ],
+    "sort": [
+        {
+            "transactionDate": {
+                "order": "desc"
+            }
+        }
+    ]
+}
