@@ -1,0 +1,1376 @@
+Skip to content
+Search or jump to…
+Pull requests
+Issues
+Marketplace
+Explore
+ 
+@hanyassar4098 
+mozekry
+/
+ElasticQueriesSamples
+Public
+3
+0
+2
+Code
+Issues
+Pull requests
+Actions
+Projects
+Wiki
+Security
+Insights
+ElasticQueriesSamples/ElasticQueryTips.txt
+
+Mohamed Zekry Aggregating nested objects, Proximity searches and Handling input sea…
+…
+Latest commit 6ef7ad7 on Feb 15
+ History
+ 0 contributors
+1331 lines (1237 sloc)  26.4 KB
+   
+Get All indices Info
+GET /_cat/indices?v
+**************************
+Delete Index
+Delete /pages
+***************************
+Add Index with settings
+ PUT /products
+ {
+   "settings": {
+     "number_of_shards": 2,
+     "number_of_replicas": 2
+   }
+ }
+**************************
+Add document without ID
+POST /products/_doc
+ {
+   "name":"Coffee Maker",
+   "price":64,
+   "in_stock":10
+ }
+*****************************
+Add document with ID
+  PUT /products/_doc/100
+ {
+   "name":"Toaster",
+   "price":49,
+   "in_stock":4
+ }
+******************************
+Get Document by ID
+
+GET /products/_doc/100
+
+Get multiple Documents by ID
+
+GET /{indexName}/_mget
+{
+  "docs": [
+    {
+      "_id": "1001"
+    },
+    {
+      "_id": "1002"
+    }
+  ]
+}
+******************************
+Decrease a value by 1  (Scripted Update)
+POST /products/_update/100
+ {
+   "script": {
+     "source": "ctx._source.in_stock--"
+   }
+ }
+ **********************
+ Assign a value (Scripted Update)
+  POST /products/_update/100
+ {
+   "script": {
+     "source": "ctx._source.in_stock = 10"
+   }
+ }
+ *********************************************
+ update the value by parameter (Scripted Update)
+   POST /products/_update/100
+ {
+   "script": {
+     "source": "ctx._source.in_stock -= params.quantity",
+     "params": {
+       "quantity":4
+     }
+   }
+ }
+***************************************************
+IF doc exist update it else insert it (upsert)
+ POST /IndexName/_update/DocumentID
+ {
+   "script": {
+     "source": "ctx._source.in_stock++"
+   },
+   "upsert": {
+     "name":"Blender",
+     "price":"399",
+     "in_stock":5
+   }
+ }
+************************************************
+Replacing Document
+ PUT /IndexName/_doc/DocumentID
+ {
+   "name":"Toaster",
+   "price":79,
+   "in_stock":4
+ }
+***********************************************
+delete document
+DELETE /IndexName/_doc/DocumentID
+*************************************************
+check current Doc version before update it
+
+POST /products/_update/100?if_primary_term=2&if_seq_no=7
+ {
+   "doc": {
+     "in_stock":123
+   }
+ }
+***************************************************
+
+Update all doc in an index by the same value
+ POST /IndexName/_update_by_query
+ {
+   "script": {
+     "source": "ctx._FieldName--",
+     "lang": "painless"
+   },
+   "query": {
+     "match_all": {}
+   }
+ }
+***********************************************************
+Perform bulk actions with a single request
+ POST /_bulk
+ {"index":{"_index":"products","_id": 200}}
+ {"name":"Espresso Machine","price":199,"in_stock":5}
+ {"create":{"_index":"products","_id":201}}
+ {"name":"Milk Frother","price":149,"in_stock":14}
+***************************************************************
+Import json file to Elastic using curl
+curl -H "Content-Type: application/x-ndjson" -XPOST http://{ElasticHost}/{IndexName}/_bulk --data-binary "@{fileName}"
+****************************************************************
+Add New Field mapping
+PUT /{IndexName}/_mapping
+{
+  "properties":
+  {
+    "{propertyName}":{
+      "type":"{propertyType}"
+    }
+  }
+}
+/******************************************************************
+/                                                                 /
+/                           Search Queries                        /
+/                                                                 /
+/******************************************************************
+get all documents in an index which contains {FieldName}
+
+{
+  
+  "query": {
+    "exists": {
+      "field": "{FieldName}"
+    }
+  }
+}
+**********************************************************
+get all documents in an index which don't contain {FieldName}
+{
+  "query": {
+    "bool": {
+      "must_not": {
+        "exists": {
+          "field": "{FieldName}"
+        }
+      }
+    }
+  }
+}
+
+**********************************************************************
+Search Using Request URI
+
+GET /{IndexName}/_search?q={Field}:{Value} and {Field}:{Value} ...
+***********************************************************************
+Match All Doc
+
+ GET /{IndexName}/_search
+ {
+   "query": {
+     "match_all": {}
+   }
+ }
+*********************************************************************
+Term Level queries (search for exact value and not analyzed)
+search for (dates, numbers, keyword)
+GET /{indexName}/_search
+{
+  "query": {
+    "term": {
+      "{Field}": "{SearchValue}"
+    }
+  }
+}
+************************************************************************
+Full text queries (analyzed using the same analyzer that defined for the filed that being searched)
+
+GET /{indexName}/_search
+{
+  "query": {
+    "match": {
+      "{Field}": "{SearchValue}"
+    }
+  }
+}
+*****************************************************************************
+Term Level queries (search for Multiple terms inside same filed) --like IN in SQL--
+
+GET /{indexName}/_search
+{
+  "query": {
+    "terms": {
+      "{Field}": [
+        "{SearchValue1}",
+        "{SearchValue2}"
+      ]
+    }
+  }
+}
+**********************************************************************************
+Get documents by IDs
+
+GET /{indexName}/_search
+{
+  "query": {
+    "ids": {
+      "values": [{id1},{id2},{id3}]
+    }
+  }
+}
+************************************************************************************
+Search in Numbers range
+
+GET /{indexName}/_search
+{
+  "query": {
+    "range": {
+      "{filed}": {
+        "gte": 1,
+        "lte": 5
+      }
+    }
+  }
+}
+****************************************************************************************
+Search in Date range
+
+GET /{indexName}/_search
+{
+  "query": {
+    "range": {
+      "{filed}": {
+        "gte": "01-01-2010",
+        "lte": "31-12-2010",
+        "format": "dd-MM-yyyy"
+      }
+    }
+  }
+}
+*************************************************************************************
+Matching documents with at least one non null value
+
+GET /{indexName}/_search
+{
+  "query": {
+    "exists": {
+      "field": "{fieldName}"
+    }
+  }
+}
+**************************************************************************************
+Matching based on prefixes (search a word begins with a prefix)
+GET /{indexName}/_search
+{
+  "query": {
+   "prefix": {
+     "{fieldName}": "{prefix}"
+   }
+  }
+}
+***************************************************************************
+Search by WildCard (* match any char, ? match single char)
+
+GET /{indexName}/_search
+{
+  "query": {
+   "wildcard": {
+     "{fieldName}": "Veget*ble"
+   }
+  }
+}
+**************************************************************************
+Full text queries with specifying the operator (AND, OR) default OR
+and >> require all words to be present in the search field
+or >> at least one word present in the search field
+GET /{indexName}/_search
+{
+  "query": {
+    "match": {
+      "{search field}": 
+      {
+        "query": "{search value}",
+        "operator": "and" 
+      }
+    }
+  }
+}
+*****************************************************************************
+Full text queries (match words in the exact order)
+
+ GET /{indexName}/_search
+ {
+   "query": {
+     "match_phrase": {
+       "{search field}": "{search value}"
+     }
+   }
+ }
+******************************************************************************
+Multi-Search (search by value in multiple fields)
+
+ GET /{indexName}/_search
+ {
+   "query": {
+     "multi_match": {
+       "query": "{search value}",
+       "fields": ["{field1}","{field2}"...]
+     }
+   }
+ }
+*****************************************************************************
+ 							Boolean Queries (Compound Queries)
+*****************************************************************************
+ Search by MUST, MUST_NOT and SHOULD with filter
+ 
+ MUST >> Document must contains the search value
+ Must_NOT >> Document must not contains the search value
+ SHOULD >> Document should contains the search value (Elastic gives the match document higher relevance score)
+ *You can use one of them only and with or without filter
+ 
+ GET /{indexName}/_search
+ {
+   "query": {
+     "bool": {
+       "must": [
+         {
+           "match": {
+             "{fieldName}": "{Value}"
+           }
+         }
+       ],
+       "must_not": [
+        {
+           "match": {
+             "{fieldName}": "{Value}"
+           }
+         }
+       ], 
+       "should": [
+        {
+           "match": {
+             "{fieldName}": "{Value}"
+           }
+         }
+       ], 
+       "filter": [
+         {
+           "range": {
+             "fieldName}": {
+               "lte": {value}
+             }
+           }
+         }
+       ]
+     }
+   }
+ }
+ 
+ 
+GET /{indexName}/_search
+{
+    "query":{
+        "bool":{
+        "filter":[
+            {
+                "term":{
+                    "{field}":"{value}"
+                    }
+            }
+        ]
+    }
+    }
+}
+ **************************************************************
+ Named Queries for debugging 
+ after execute the query look for "matched_queries" object
+ it has the matched fields according to every query clause 
+ 
+ GET /{indexName}/_search
+{
+  "query": {
+    "bool": {
+      "must": [
+        {
+          "match": {
+            "{field}": {
+              "query": "{Value}",
+              "_name": "{AliasName}"
+            }
+          }
+        }
+      ],
+       "must_not": [
+        {
+          "match": {
+            "{field}": {
+              "query": "{Value}",
+              "_name": "{AliasName}"
+            }
+          }
+        }
+      ],
+      "should": [
+        {
+          "match": {
+            "{field}": {
+              "query": "{Value}",
+              "_name": "{AliasName}"
+            }
+          }
+        }
+      ],
+      "filter":[
+        {
+          "range":{
+            "{field}":{
+              "lte":{integer},
+              "_name":"{AliasName}"
+            }
+          }
+        }
+        ]
+    }
+  }
+}
+*********************************************************************
+Query Nested documents
+
+GET /{indexName}/_search
+{
+  "query": {
+    "nested": {
+      "path": "{path_to_nested_doc}",
+      "query": {
+        "bool": {
+          "must": [
+            {
+              "match": {
+                "{path to the field}": "{value}"
+              }
+            },
+            {
+              "term": {
+                "{path to the field}": "{value}"
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}
+***************************************************************************
+Get nested result only (INNER_Hits)
+
+_source : false >> to remove unmatched result from nested document 
+GET /department/_search
+{
+  "_source": false, 
+  "query": {
+    "nested": {
+      "path": "{path_to_nested_doc}",
+      "inner_hits": {}, 
+      "query": {
+        "bool": { 
+         "must": [
+        {
+          "match": {
+            "{path to the field}": "{value}"
+          }
+        },
+        {
+          "term": {
+            "{path to the field}": "{value}"
+          }
+        }
+      ]
+      }
+      }
+    }
+  }
+}
+/******************************************************************
+/                                                                 /
+/                           Joining Queries                       /
+/                                                                 /
+/******************************************************************
+Create index with join mapping
+PUT /{indexName}
+{
+  "mappings": {
+    "properties": {
+      "{join_field}":{
+        "type": "join",
+        "relations":{
+          "{parentName}":"{chiledName}"
+        }
+      }
+    }
+  }
+}
+*******************************************************************
+Adding Parent document with join 
+
+PUT /{indexName}/_doc/{id}
+{
+  "name":"{value}",
+  "{join_field}":"{value}"
+}
+
+Adding child document with join 
+
+PUT /{indexName}/_doc/{id}?routing={parent document ID}
+{
+  "{field1}":"{value}",
+  "{field2}":{value}, 
+  "{field3}":"{value}",
+  "{join_field}":{
+    "name":"{childTypeName}", 
+    "parent":{parent document ID}
+  }
+}
+************************************************************************
+Get child documents by parent ID
+
+GET /{indexName}/_search
+{
+  "query": {
+    "parent_id":{
+      "type":"{childName}",
+      "id":{parentID}
+    }
+  }
+}
+***********************************************************************
+Get child documents when parent document match a query
+
+GET /{indexName}/_search
+{
+  "query": {
+   "has_parent": {
+     "parent_type": "{parentTypeName}",
+     "query": {
+       "term": {
+         "{fieldName}.keyword": "{value}"
+       }
+     }
+   }
+  }
+}
+**************************************************************************
+Get parent documents when child documents match a query
+
+GET /{indexName}/_search
+{
+  "query": {
+   "has_child": {
+     "type": "{chiledTypeName}",
+     "query": {
+       "bool": {
+         "must": [
+           {"range":{
+             "{field}": {
+               "gte": {value}
+             }
+           }
+             
+           }
+         ],
+         "should": [
+           {
+             "term": {
+               "{field}.keyword":"{value}"
+             }
+           }
+         ]
+       }
+     }
+   }
+  }
+}
+****************************************************
+Create index with multiple join mapping
+
+company index has 2 children ["department","supplier"] 
+department has 1 child "employee"
+
+PUT /company
+{
+  "mappings": {
+    "properties": {
+      "join_field":{
+        "type": "join",
+        "relations":{
+          "company":["department","supplier"],
+          "department":"employee"
+        }
+      }
+    }
+  }
+}
+*************************************************************
+ Adding child documents with multiple join 
+ 
+ - Add root document (represent company)
+ PUT /company/_doc/1
+{
+  "name": "My Company Inc.",
+  "join_field": "company"
+}
+
+- Add parent document (represent department)
+PUT /company/_doc/2?routing=1
+{
+  "name": "Development",
+  "join_field": {
+    "name": "department",
+    "parent": 1
+  }
+}
+
+- Add child document (represent employee)
+PUT /company/_doc/3?routing=1
+{
+  "name": "Bo Andersen",
+  "join_field": {
+    "name": "employee",
+    "parent": 2
+  }
+}
+*******************************************************************
+Search documents with multiple join
+
+GET /company/_search
+{
+  "query": {
+    "has_child": {
+      "type": "department",
+      "query": {
+        "has_child": {
+          "type": "employee",
+          "query": {
+            "term": {
+              "name.keyword": "Bo Andersen"
+              
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+*****************************************************************
+Parent and child query with INNER_Hits
+
+- child inner_hits
+
+GET /department/_search
+{
+  "query": {
+    "has_child": {
+      "type": "employee",
+      "inner_hits": {}, 
+      "query": {
+        "bool": {
+          "must": [
+            {
+              "range": {
+                "age": {
+                  "gte": 50
+                }
+              }
+            }
+          ],
+          "should": [
+            {
+              "term": {
+                "gender.keyword": "M"
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}
+
+- Parent inner_hits
+
+GET /department/_search
+{
+  "query": {
+    "has_parent": {
+      "parent_type": "department",
+      "inner_hits": {}, 
+      "query": {
+        "term": {
+          "name.keyword": "Development"
+        }
+      }
+    }
+  }
+}
+******************************************************************************
+Looking up terms within another document
+
+*you want to get stories from stories index that the user id = 1 -in users index- is following
+
+- user index structure
+
+PUT /users/_doc/1
+{
+  "name": "John Roberts",
+  "following" : [2, 3]
+}
+
+- stories index structure
+
+PUT /stories/_doc/2
+{
+  "user": 1,
+  "content": "Just another day at the office... #coffee"
+}
+
+GET /stories/_search
+{
+  "query": {
+    "terms": {
+      "user": {
+        "index": "users",
+        "id": "1",
+        "path": "following"
+      }
+    }
+  }
+}
+/******************************************************************
+/                                                                 /
+/                        Controlling Query Results                /
+/                                                                 /
+/******************************************************************
+Get specific fields from _source object
+
+- Get Single Field
+GET /{indexName}/_search
+{
+  "_source": "{Field}", 
+    "query": {
+      "match": "{field}":"{value}",
+    }
+}
+
+- Get by wild card
+GET /{indexName}/_search
+{
+  "_source": "{Field}.*", 
+    "query": {
+      "match": "{field}":"{value}",
+    }
+}
+
+- Get by array of fields
+GET /{indexName}/_search
+{
+  "_source": ["field1.*","field2"], 
+    "query": {
+      "match": "{field}":"{value}",
+    }
+}
+
+- includes and excludes fields
+GET /{indexName}/_search
+{
+  "_source": {
+    "includes": "ingredients.*",
+    "excludes": "ingredients.name"
+  }, 
+    "query": {
+     "match": "{field}":"{value}",
+    }
+}
+**************************************************************
+Controlling the number of result return (maximum number of hits)
+default 10 
+
+- by query parameter
+GET /{indexName}/_search?size=2
+{
+  "_source": false, 
+    "query": {
+     "match": "{field}":"{value}",
+    }
+}
+
+- by request body
+GET /{indexName}/_search
+{
+  "_source": false, 
+  "size": 2,
+  "from": 4,
+   "query": {
+     "match": "{field}":"{value}",
+    }
+}
+***************************************************************
+specify the offset (pagination)
+default 0
+
+GET /{indexName}/_search
+{
+  "_source": false, 
+  "size": 2,
+  "from": 4,
+   "query": {
+     "match": "{field}":"{value}",
+    }
+}
+****************************************************************
+implement pagination
+
+total pages = ceil(total_hits/pageSize)
+from = (pageSize * (page_number -1))
+*****************************************************************
+Sorting Results
+sortOrder >> asc, desc
+
+GET /{indexName}/_search
+{
+    "query": {
+        "match_all": {}
+    },
+    "sort": [
+        {
+            "{field1}": "{sortOrder}"
+        },
+        {
+            "{field1}": "{sortOrder}"
+        }
+    ]
+}
+*****************************************************************
+Sorting by multi value field
+
+mode avg > get the average value of array then sort by it
+other modes ("max","min","sum")
+
+GET /{indexName}/_search
+{
+  
+  "query": {
+    "match_all": {}
+  },
+  "sort": [
+     {
+       "{field1}": {
+         "order": "desc",
+         "mode": "avg"
+       }
+     }
+    ]
+}
+***********************************************************************
+Filter the result 
+
+GET /{indexName}/_search
+{
+  "query": {
+    "bool": {
+      "must": [
+        {
+          "match": {
+            "{field}": {value}
+          }
+        }
+      ],
+      "filter": [
+        {
+          "range": {
+            "{field}": {
+              "lt": {value}
+            }
+          }
+        }
+      ]
+    }
+  }
+}
+
+anther example 
+
+GET /{indexName}/_search
+{
+    "query":{
+        "bool":{
+        "filter":[
+            {
+                "term":{
+                    "{field}":"{value}"
+                    }
+            }
+        ]
+    }
+    }
+}
+/******************************************************************
+/                                                                 /
+/                        Aggregations                			  /
+/                                                                 /
+/******************************************************************
+
+					Metric Aggregations
+					*******************
+					
+-Get SUM, AVG, MIN, MAX value of a field					
+GET /{indexName}/_search
+{
+  "size": 0,
+  "aggs": {
+    "{any given name}": {
+      "sum": {
+        "field": "{fieldName}"
+      }
+    },
+     "{any given name}": {
+      "avg": {
+        "field": "{fieldName}"
+      }
+    },
+     "{any given name}": {
+      "min": {
+        "field": "{fieldName}"
+      }
+    },
+     "{any given name}": {
+      "max": {
+        "field": "{fieldName}"
+      }
+    }
+  }
+}
+  }
+}
+**************************************************************
+- cardinality >> Count distinct value of a given field
+
+GET /{indexName}/_search
+{
+  "size": 0,
+  "aggs": {
+    "{any given name}":{
+      "cardinality": {
+        "field": "{fieldName}"
+      }
+    }
+  }
+}
+*****************************************************************
+
+- Get Value Count of a given field
+
+GET /{indexName}/_search
+{
+  "size": 0,
+  "aggs": {
+    "{any given name}":{
+      "value_count": {
+        "field": "{fieldName}"
+      }
+    }
+  }
+}
+*******************************************************************
+Get value_count, min, max, avg, sum of a given field in one query
+
+GET /{indexName}/_search
+{
+  "size": 0,
+  "aggs": {
+    "{any given name}":{
+      "stats": {
+        "field": "{fieldName}"
+      }
+    }
+  }
+}
+*********************************************************************
+						Bucket Aggregations
+						*******************
+- "missing" >> field name for count NULL or empty value of aggregation field
+- "min_doc_count" >> min number of documents to be present in bucket array
+					
+GET /{indexName}/_search
+{
+  "size": 0,
+  "aggs": {
+    "{any given name}": {
+      "terms": {
+        "field": "{fieldName}",
+        "missing": "{any given name}",
+        "min_doc_count": 0,
+        "order": {
+          "_key": "asc"
+        }
+        
+      }
+    }
+  }
+}
+**************************************************************************
+						Nested Aggregations
+						*******************
+						
+						
+GET /{indexName}/_search
+{
+  "size": 0,
+  "aggs": {
+    "{any given name}": {
+      "terms": {
+        "field": "{FieldName}"
+      },
+      "aggs": {
+        "{any given name}": {
+          "{aggregationType}": {
+            "field": "{FieldName}"
+          }
+        }
+      }
+    }
+  }
+}
+******************************************************
+Nested aggregation with filter
+
+GET /{indexName}/_search
+{
+  "size": 0,
+  "query": {
+    "range": {
+      "{fieldName}": {
+        "gte": 100
+      }
+    }
+  }, 
+ "aggs": {
+    "{any given name}": {
+      "terms": {
+        "field": "status"
+      },
+      "aggs": {
+        "{any given name}": {
+          "{aggregationType}": {
+            "field": "{FieldName}"
+          }
+        }
+      }
+    }
+  }
+}
+
+GET /{indexName}/_search
+{
+  "size": 0,
+  "aggs": {
+    "{any given name}": {
+      "filter": {
+        "{FilterType}": {
+          "{fieldName}": "{value}"
+        }
+      },
+      "aggs": {
+        "{aggregation name}": {
+          "{aggregationType}": {
+            "field": "{FieldName}"
+          }
+        }
+      }
+    }
+  }
+  
+}
+*************************************************************
+Count doc by filters and aggregate the results by a given field
+
+ GET /{indexName}/_search
+ {
+   "size": 0,
+   "aggs": {
+     "{aggregationName}": {
+       "filters": {
+         "filters": {
+           "{bucketName1}": {
+               "{FilterType}": {
+                 "{fieldName}": "{value}"
+               }
+           },
+            "{bucketName2}": {
+               "{FilterType}": {
+                 "{fieldName}": "{value}"
+               }
+           }
+         }
+       },
+       "aggs": {
+         "{aggregationName}": {
+           "{aggregationType}": {
+             "field": "{fieldName}"
+           }
+         }
+       }
+     }
+   }
+ }
+*********************************************************************
+								Range Aggregations
+								******************
+								
+GET /{indexName}/_search
+{
+  "size": 0,
+  "aggs": {
+    "{aggregationName}": {
+      "range": {
+        "field": "{fieldName}",
+        "ranges": [
+          {
+            "to": {value}
+          },
+          {
+            "from": {value}, 
+            "to": {value}
+          },
+          {
+            "from": {value}
+          }
+          
+        ]
+      }
+    }
+  }
+}
+
+
+Date Range
+
+GET /{indexName}/_search
+{
+  "size": 0,
+  "aggs": {
+    "{aggregationName}": {
+      "date_range": {
+        "field": "{fieldName}",
+        "keyed": true,
+        "format": "yyy-MM-dd", 
+        "ranges": [
+          {
+            "from": "{value}",// format > yyy-MM-dd
+            "to": "{value}||+6M", // +6M add 6 months 
+            "key": "{KeyName}"
+          },
+          {
+            "from": "{value}||+6M", 
+            "to": "{value}||+1y", // +1y add 1 year
+            "key": "{keyName}"
+          }
+        ]
+      },
+      "aggs": {
+        "{aggregationName}": {
+          "{aggregationType}": {
+            "field": "{fieldName}"
+          }
+        }
+      }
+    }
+  }
+}
+****************************************************************************
+									Histogram Aggregations
+									*********
+Dynamically create buckets according to interval 
+
+
+GET /{indexName}/_search
+{
+  "size":0,
+  "aggs": {
+    "{aggregationName}": {
+      "histogram": {
+        "field": "{fieldName}",
+        "interval": {value},
+        "min_doc_count": {value},
+        "extended_bounds": {
+          "min": {value},
+          "max": {value}
+        }
+      }
+    }
+  }
+}
+
+Date Histogram
+***************
+GET /order/_search
+{
+  "size":0,
+  "aggs": {
+    "{aggregationName}": {
+      "date_histogram": {
+        "field": "{fieldName}",
+        "calendar_interval": "{value}",
+        "min_doc_count": 1,
+        "extended_bounds": {
+          "min": 0,
+          "max": 500
+        }
+      }
+    }
+  }
+}
+****************************************************************
+							Global Aggregations
+							********************
+"global": {} >> will aggregate over all index documents regardless of the query filter							
+GET /{indexName}/_search
+{
+  
+  "query": {
+    "range": {
+      "total_amount": {
+        "gte": 100
+      }
+    }
+  },
+  "size": 0, 
+  "aggs": {
+    "{aggregationName}": {
+      "global": {}, 
+     "aggs": {
+       "{aggregationName}": {
+         "{aggregationType}": {
+           "field": "{fieldName}"
+         }
+       }
+     }
+    }
+  }
+}
+*****************************************************************
+						Aggregating nested objects
+						**************************
+						
+GET /{indexName}/_search
+{
+  "size": 0,
+  "aggs": {
+    "{aggregationName}": {
+      "nested": {
+        "path": "{nested Path}"
+      },
+      "aggs": {
+        "{aggregationName}": {
+          "{aggregationType}": {
+            "field": "{fileName}"
+          }
+        }
+      }
+    }
+  }
+}
+*********************************************************************
+							Improving Search Results
+							************************
+- Proximity searches
+
+slope >> specify the number of position on any direction the document must match
+e.g. >> 
+if search phrase is "spicy sauce" and slop = 1 >> match > "Spicy (Tomato) Sauce"
+Sauce moved one position
+if slope = 2 >> match > Tomato Sauce spicy
+spicy moved two positions
+
+GET /{indexName}/_search
+{
+  "query": {
+    "match_phrase": {
+      "{fieldName}": {
+        "query": "{search phrase}",
+        "slop": 2
+      }
+    }
+  }
+}
+
+- Handling input search typos
+
+fuzziness >> will shuffle the characters by max distance = 2 to find a match 
+eg. >> Epple >> Apple, l0bster >> lobster
+GET /{indexName}/_search
+{
+  "query": {
+    "match": {
+      "name": {
+        "query": "{search phrase}",
+        "fuzziness": "auto"
+      }
+    }
+  }
+}
+© 2021 GitHub, Inc.
+Terms
+Privacy
+Security
+Status
+Docs
+Contact GitHub
+Pricing
+API
+Training
+Blog
+About
+Loading complete
