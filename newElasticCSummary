@@ -1361,16 +1361,40 @@ GET /{indexName}/_search
     }
   }
 }
-© 2021 GitHub, Inc.
-Terms
-Privacy
-Security
-Status
-Docs
-Contact GitHub
-Pricing
-API
-Training
-Blog
-About
-Loading complete
+
+///////////////////////////////Query By _sql///////////////////
+GET/{Host}/_sql                    by add ( /translate ) the query will translated to opposit script
+
+{
+   "query":" select CompanyID , CompanyName from {index Name } where CompanyID = 1005070"
+}
+
+--------------=============the Genareted 
+{
+    "size": 1000,
+    "query": {
+        "term": {
+            "CompanyID": {
+                "value": 1005070,
+                "boost": 1.0
+            }
+        }
+    },
+    "_source": false,
+    "fields": [
+        {
+            "field": "CompanyID"
+        },
+        {
+            "field": "CompanyName"
+        }
+    ],
+    "sort": [
+        {
+            "_doc": {
+                "order": "asc"
+            }
+        }
+    ]
+}
+///////////////
